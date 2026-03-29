@@ -429,6 +429,8 @@ def main():
                     speed_labels,
                     coordinates,
                     timestamps)):
+            mask = zone.trigger(detections=detections)
+            detections_filtered = detections[mask]
             points = detections_filtered.get_anchors_coordinates(
                     anchor=sv.Position.BOTTOM_CENTER)
             # Intégrer le transformateur de vue dans un pipeline de détection existant

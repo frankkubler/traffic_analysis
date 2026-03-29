@@ -1,5 +1,4 @@
 .venv
-kernet.errors.txt
 __pycache__/
 *.pyc
 *.pyo
@@ -15,3 +14,4 @@ parts
 sdist
 var
 *.log
+kernel.errors.txt
