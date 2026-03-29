@@ -358,7 +358,8 @@ def main():
             # labels = [
             # f"#{tracker_id} "
             # for _,_,_,_,tracker_id in detections_filtered]
-            # line_zone.trigger(detections=detections_filtered)
+            line_zone.trigger(detections=detections_filtered)
+
             annotated_frame = sv.draw_line(scene=annotated_frame,
                                            start=line_start,
                                            end=line_end,
@@ -366,11 +367,10 @@ def main():
             # annotated_frame = zone_annotator.annotate(scene=annotated_frame,
             #  label=f"Dir. Ouest : {i+random.randint(0,100)}")
             direction_label = "Dir. West" if i == 0 else "Dir. East"
+            total_count = line_zone.in_count + line_zone.out_count
             annotated_frame = zone_annotator.annotate(
                 scene=annotated_frame,
-                label=f"{direction_label} : {line_zone.in_count}") if i == 0 else zone_annotator.annotate(
-                    scene=annotated_frame,
-                    label=f"{direction_label} : {line_zone.out_count}")
+                label=f"{direction_label} : {total_count}")
 
             annotated_frame = label_annotator.annotate(
                 scene=annotated_frame,
@@ -386,9 +386,8 @@ def main():
             annotated_frame = trace_annotator.annotate(
                 scene=annotated_frame,
                 detections=detections_filtered)
-            line_zone.trigger(detections=detections_filtered)
-            # print(line_zone.in_count)
-            # print(line_zone.out_count)
+            # print(f"Line Zone In Count: {line_zone.in_count}", {i: direction_label})
+            # print(f"Line Zone Out Count: {line_zone.out_count}", {i: direction_label})
         return annotated_frame
     # for direct show
     cap = cv2.VideoCapture(VIDEO)
