@@ -46,6 +46,8 @@ def main():
 
     # Load OpenVINO model for better performance
     MODEL = "models/yolov8s.pt"
+    # MODEL = "models/yolo11s.pt"
+    # MODEL = "models/yolo26s.pt"
     model = YOLO(MODEL)
 
     # Get class names dictionary
@@ -53,6 +55,8 @@ def main():
     print(CLASS_NAMES_DICT)
 
     model_openvino = YOLO("models/yolov8s_openvino_model/", task="detect")
+    # model_openvino = YOLO("models/yolo11s_openvino_model", task='detect')
+    # model_openvino = YOLO("models/yolo26s_openvino_model", task='detect')
     colors = sv.ColorPalette.LEGACY
 
     video_info = sv.VideoInfo.from_video_path(VIDEO)
