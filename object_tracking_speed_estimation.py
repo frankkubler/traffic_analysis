@@ -342,8 +342,9 @@ def main():
                 coordinate[tracker_id].append(y)
 
             # wait to have enough data
+            safe_fps = fps if fps > 0 else 25
             for tracker_id in detections_filtered.tracker_id:
-                if len(coordinate[tracker_id]) < fps/2:
+                if len(coordinate[tracker_id]) < safe_fps / 2:
                     # print(coordinates[tracker_id], " - id :",
                     #  tracker_id, 'len : ', len(coordinates[tracker_id]))
                     speed_label.append(f"#{tracker_id}")
@@ -352,8 +353,8 @@ def main():
                         coordinate_start = coordinate[tracker_id][-1]
                         coordinate_end = coordinate[tracker_id][0]
                         distance = abs(coordinate_start - coordinate_end)
-                        time = len(coordinate[tracker_id]) / fps
-                        speed = distance / time * 3.6
+                        elapsed = len(coordinate[tracker_id]) / safe_fps
+                        speed = distance / elapsed * 3.6 if elapsed > 0 else 0.0
                         speed_label.append(f"{int(speed)} km/h")
 
                     except Exception as e:
@@ -396,7 +397,7 @@ def main():
     # for direct show
     cap = cv2.VideoCapture(VIDEO)
     # fps = int(cap.get(cv2.CAP_PROP_FPS))
-    fps = video_info.fps
+    fps = video_info.fps or cap.get(cv2.CAP_PROP_FPS) or 25
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     print(f"FPS: {fps}")
@@ -408,7 +409,7 @@ def main():
         if not ret:
             break
         # frame=cv2.resize(frame,(1280,720))
-        show = process_frame(frame, int(fps))
+        show = process_frame(frame, int(fps) or 25)
         fps_monitor.tick()
         current_fps = fps_monitor.fps
         fps_text = f"FPS: {current_fps:.0f}"
