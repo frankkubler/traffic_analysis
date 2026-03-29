@@ -1,1 +1,17 @@
 .venv
+kernet.errors.txt
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.dylib
+*.egg
+*.egg-info
+dist
+build
+eggs
+parts
+sdist
+var
+*.log

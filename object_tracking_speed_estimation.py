@@ -5,7 +5,15 @@ import numpy as np
 import supervision as sv
 from collections import defaultdict, deque
 from ultralytics import YOLO
+from PIL import ImageFont, ImageDraw, Image
 import time
+
+_FONT_PATH = "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf"
+try:
+    _font_title = ImageFont.truetype(_FONT_PATH, 15)
+    _font_body = ImageFont.truetype(_FONT_PATH, 13)
+except OSError:
+    _font_title = _font_body = ImageFont.load_default()
 
 
 def main():
@@ -54,9 +62,9 @@ def main():
     CLASS_NAMES_DICT = model.model.names
     print(CLASS_NAMES_DICT)
 
-    model_openvino = YOLO("models/yolov8s_openvino_model/", task="detect")
+    # model_openvino = YOLO("models/yolov8s_openvino_model/", task="detect")
     # model_openvino = YOLO("models/yolo11s_openvino_model", task='detect')
-    # model_openvino = YOLO("models/yolo26s_openvino_model", task='detect')
+    model_openvino = YOLO("models/yolo26s_openvino_model", task='detect')
     colors = sv.ColorPalette.LEGACY
 
     video_info = sv.VideoInfo.from_video_path(VIDEO)
@@ -290,13 +298,101 @@ def main():
     # initialize the dictionary that we 
     # will use to store the coordinates for each zone
     coordinates = defaultdict(lambda: deque(maxlen=30))
-    coordinates = defaultdict(lambda: deque(maxlen=30))
     coordinates = np.append(coordinates, defaultdict(lambda: deque(maxlen=30)))
     coordinates = np.append(coordinates, defaultdict(lambda: deque(maxlen=30)))
+    # Timestamps réels (live stream) — parallèles aux coordonnées
+    timestamps = defaultdict(lambda: deque(maxlen=30))
+    timestamps = np.append(timestamps, defaultdict(lambda: deque(maxlen=30)))
+    timestamps = np.append(timestamps, defaultdict(lambda: deque(maxlen=30)))
+
+    # Speed limits per zone (km/h)
+    SPEED_LIMITS = [110, 110, 70]
+    # Cumulative count of speeding vehicles per zone
+    speeding_counts = [0, 0, 0]
+    # Track already-counted tracker IDs per zone to avoid double-counting
+    speeding_tracker_ids = [set(), set(), set()]
+    # Max speed observed per zone and overall
+    max_speeds = [0.0, 0.0, 0.0]
+    max_speed_global = [0.0]  # list to allow mutation inside nested function
+    # Speed samples history per zone and per tracker_id — used to compute peak speed
+    speed_samples = [defaultdict(list) for _ in range(3)]
+
+    # Cache: stores (key, panel_bgr, panel_alpha_f) to avoid re-rendering every frame
+    _panel_cache = [None, None, None]
+
+    def _render_panel(speed_limits: list, counts: list,
+                      zone_max_speeds: list, global_max: float):
+        """Render the stats panel once as (bgr_array, alpha_float_array) via PIL.
+
+        Only called when stats actually change; result is cached.
+        """
+        panel_w, line_h, padding = 295, 24, 10
+        n_lines = 1 + len(speed_limits) + 1 + 1
+        panel_h = padding * 2 + n_lines * line_h + (n_lines - 1) * 2
+
+        pil_panel = Image.new("RGBA", (panel_w, panel_h), (10, 10, 10, 145))
+        draw = ImageDraw.Draw(pil_panel)
+
+        draw.text((padding, padding), "Dépassements vitesse",
+                  font=_font_title, fill=(255, 255, 255, 255))
+
+        for idx, (limit, count, zmax) in enumerate(
+            zip(speed_limits, counts, zone_max_speeds)
+        ):
+            c = colors.by_idx(idx)
+            y = padding + (idx + 1) * (line_h + 2)
+            text = f"Zone {idx + 1} (>{limit} km/h) : {count} veh.  max {int(zmax)} km/h"
+            draw.text((padding, y), text, font=_font_body, fill=(c.r, c.g, c.b, 255))
+
+        sep_y = padding + (len(speed_limits) + 1) * (line_h + 2)
+        draw.line([(padding, sep_y), (panel_w - padding, sep_y)],
+                  fill=(180, 180, 180, 200), width=1)
+        draw.text((padding, sep_y + 5), f"Max globale : {int(global_max)} km/h",
+                  font=_font_title, fill=(0, 215, 255, 255))
+
+        arr = np.array(pil_panel)                           # H×W×4  uint8 RGBA
+        panel_rgb = arr[:, :, :3][:, :, ::-1].copy()       # RGB → BGR
+        panel_alpha = (arr[:, :, 3:] / 255.0).astype(np.float32)  # H×W×1 [0,1]
+        return panel_rgb, panel_alpha, panel_w, panel_h
+
+    def draw_speed_stats(
+        frame: np.ndarray,
+        speed_limits: list,
+        counts: list,
+        zone_max_speeds: list,
+        global_max: float,
+    ) -> np.ndarray:
+        """Composite the cached stats panel onto the frame using numpy alpha-blending.
+
+        PIL is only called when the stats data actually changes (rare), making
+        per-frame cost a simple numpy slice operation instead of two full-frame
+        colour conversions.
+        """
+        key = (tuple(counts), tuple(int(z) for z in zone_max_speeds), int(global_max))
+        if _panel_cache[0] != key:
+            panel_bgr, panel_alpha, pw, ph = _render_panel(
+                speed_limits, counts, zone_max_speeds, global_max)
+            _panel_cache[0] = key
+            _panel_cache[1] = panel_bgr
+            _panel_cache[2] = (panel_alpha, pw, ph)
+
+        panel_bgr = _panel_cache[1]
+        panel_alpha, pw, ph = _panel_cache[2]
+
+        h, w = frame.shape[:2]
+        x0, y0 = w - pw - 10, 10
+        roi = frame[y0:y0 + ph, x0:x0 + pw].astype(np.float32)
+        frame[y0:y0 + ph, x0:x0 + pw] = (
+            roi * (1.0 - panel_alpha) + panel_bgr.astype(np.float32) * panel_alpha
+        ).astype(np.uint8)
+        return frame
+
     # frame processing
 
-    def process_frame(frame: np.ndarray, fps) -> np.ndarray:
+    def process_frame(frame: np.ndarray) -> np.ndarray:
         speed_labels = [], [], []
+        # Force CPU device: OpenVINO on Intel iGPU triggers an IGC kernel error
+        # (intersecting register V37/V38) causing NaN outputs and garbage detections
         results = model_openvino(frame, imgsz=640, verbose=False)[0]
         # results = model(frame)[0]
         detections = sv.Detections.from_ultralytics(results)
@@ -318,7 +414,8 @@ def main():
                 line_end,
                 view_transformer,
                 speed_label,
-                coordinate) in enumerate(zip(
+                    coordinate,
+                    timestamp) in enumerate(zip(
                     zones,
                     zone_annotators,
                     box_annotators,
@@ -330,32 +427,43 @@ def main():
                     lines_end,
                     view_transformers,
                     speed_labels,
-                    coordinates)):
-
-            mask = zone.trigger(detections=detections)
-            detections_filtered = detections[mask]
+                    coordinates,
+                    timestamps)):
             points = detections_filtered.get_anchors_coordinates(
                     anchor=sv.Position.BOTTOM_CENTER)
             # Intégrer le transformateur de vue dans un pipeline de détection existant
             points = view_transformer.transform_points(points=points).astype(int)
             for tracker_id, [_, y] in zip(detections_filtered.tracker_id, points):
                 coordinate[tracker_id].append(y)
+                timestamp[tracker_id].append(time.time())
 
-            # wait to have enough data
-            safe_fps = fps if fps > 0 else 25
+            # wait to have enough data (au moins 2 points et 0.3 s écoulées)
             for tracker_id in detections_filtered.tracker_id:
-                if len(coordinate[tracker_id]) < safe_fps / 2:
-                    # print(coordinates[tracker_id], " - id :",
-                    #  tracker_id, 'len : ', len(coordinates[tracker_id]))
+                if len(timestamp[tracker_id]) < 2:
                     speed_label.append(f"#{tracker_id}")
                 else:
                     try:
+                        elapsed = timestamp[tracker_id][-1] - timestamp[tracker_id][0]
+                        if elapsed <= 0:
+                            speed_label.append(f"#{tracker_id}")
+                            continue
                         coordinate_start = coordinate[tracker_id][-1]
                         coordinate_end = coordinate[tracker_id][0]
                         distance = abs(coordinate_start - coordinate_end)
-                        elapsed = len(coordinate[tracker_id]) / safe_fps
-                        speed = distance / elapsed * 3.6 if elapsed > 0 else 0.0
-                        speed_label.append(f"{int(speed)} km/h")
+                        speed = distance / elapsed * 3.6
+                        # Accumulate speed samples and derive peak speed for this vehicle
+                        speed_samples[i][tracker_id].append(speed)
+                        peak_speed = max(speed_samples[i][tracker_id])
+                        speed_label.append(f"{int(peak_speed)} km/h")
+                        # Update max speeds using peak speed
+                        if peak_speed > max_speeds[i]:
+                            max_speeds[i] = peak_speed
+                        if peak_speed > max_speed_global[0]:
+                            max_speed_global[0] = peak_speed
+                        # Count speeding vehicles once, based on peak speed
+                        if peak_speed > SPEED_LIMITS[i] and tracker_id not in speeding_tracker_ids[i]:
+                            speeding_tracker_ids[i].add(tracker_id)
+                            speeding_counts[i] += 1
 
                     except Exception as e:
                         speed_label.append(f"#{tracker_id}")
@@ -393,6 +501,7 @@ def main():
                 detections=detections_filtered)
             # print(f"Line Zone In Count: {line_zone.in_count}", {i: direction_label})
             # print(f"Line Zone Out Count: {line_zone.out_count}", {i: direction_label})
+        draw_speed_stats(annotated_frame, SPEED_LIMITS, speeding_counts, max_speeds, max_speed_global[0])
         return annotated_frame
     # for direct show
     cap = cv2.VideoCapture(VIDEO)
@@ -409,7 +518,7 @@ def main():
         if not ret:
             break
         # frame=cv2.resize(frame,(1280,720))
-        show = process_frame(frame, int(fps) or 25)
+        show = process_frame(frame)
         fps_monitor.tick()
         current_fps = fps_monitor.fps
         fps_text = f"FPS: {current_fps:.0f}"
