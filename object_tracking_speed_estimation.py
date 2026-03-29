@@ -106,7 +106,7 @@ def main():
     zones = [
         sv.PolygonZone(
             polygon=polygon,
-            frame_resolution_wh=video_info.resolution_wh
+            # frame_resolution_wh=video_info.resolution_wh
         )
         for polygon
         in polygons
@@ -132,24 +132,24 @@ def main():
         for index
         in range(len(zones))
     ]
-    # box_annotators = [
-    #     sv.BoxAnnotator(
-    #         color=colors.by_idx(index),
-    #         thickness=1,
-    #         text_thickness=1,
-    #         text_scale=0.5
-    #         )
-    #     for index
-    #     in range(len(polygons))
-    # ]
     box_annotators = [
-        sv.BoundingBoxAnnotator(
+        sv.BoxAnnotator(
             color=colors.by_idx(index),
             thickness=1,
+            # text_thickness=1,
+            # text_scale=0.5
             )
         for index
         in range(len(polygons))
     ]
+    # box_annotators = [
+    #     sv.BoundingBoxAnnotator(
+    #         color=colors.by_idx(index),
+    #         thickness=1,
+    #         )
+    #     for index
+    #     in range(len(polygons))
+    # ]
 
     trace_annotators = [
         sv.TraceAnnotator(
@@ -200,9 +200,9 @@ def main():
     # ]
     # initialyze ByteTracker
     byte_tracker = sv.ByteTrack(
-        track_thresh=0.25,
-        track_buffer=100, 
-        match_thresh=0.8,
+        track_activation_threshold=0.25,
+        lost_track_buffer=100,
+        minimum_matching_threshold=0.8,
         frame_rate=video_info.fps
     )
     # byte_tracker = sv.ByteTrack()
@@ -407,8 +407,8 @@ def main():
         # frame=cv2.resize(frame,(1280,720))
         show = process_frame(frame, int(fps))
         fps_monitor.tick()
-        fps = fps_monitor()
-        fps_text = f"FPS: {fps:.0f}"
+        current_fps = fps_monitor.fps
+        fps_text = f"FPS: {current_fps:.0f}"
         cv2.putText(show, fps_text, (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         cv2.imshow("Counting - Speed Estimation", show)
         if cv2.waitKey(1) & 0xFF == ord('q'):
