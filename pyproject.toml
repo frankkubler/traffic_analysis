@@ -8,6 +8,7 @@ dependencies = [
     "opencv-python>=4.11.0.86",
     "opencv-python-headless>=4.11.0.86",
     "openvino>=2026.0",
+    "pillow>=12.2.0",
     "supervision>=0.27.0.post2",
     "ultralytics>=8.4.30",
     "vidgear>=0.3.4",
