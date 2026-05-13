@@ -11,6 +11,7 @@ dependencies = [
     "pillow>=12.2.0",
     "supervision>=0.27.0.post2",
     "ultralytics>=8.4.30",
+    "urllib3>=2.7.0",
     "vidgear>=0.3.4",
     "yt-dlp>=2026.3.17",
 ]
