@@ -5,13 +5,14 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "opencv-python>=4.11.0.86",
-    "opencv-python-headless>=4.11.0.86",
+    "opencv-python>=5.0.0.93",
+    "opencv-python-headless>=5.0.0.93",
     "openvino>=2026.0",
     "pillow>=12.2.0",
     "supervision>=0.27.0.post2",
+    "trackers>=2.5.0.post0",
     "ultralytics>=8.4.30",
     "urllib3>=2.7.0",
     "vidgear>=0.3.4",
-    "yt-dlp>=2026.3.17",
+    "yt-dlp>=2026.6.9",
 ]

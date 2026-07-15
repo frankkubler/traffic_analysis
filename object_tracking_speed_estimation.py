@@ -3,6 +3,8 @@ from vidgear.gears import CamGear
 import cv2
 import numpy as np
 import supervision as sv
+from trackers import ByteTrackTracker, SORTTracker, BoTSORTTracker, CBIoUTracker, OCSORTTracker
+
 from collections import defaultdict, deque
 from ultralytics import YOLO
 from PIL import ImageFont, ImageDraw, Image
@@ -211,13 +213,33 @@ def main():
     #     sv.Point(x=1077, y=320)
     # ]
     # initialyze ByteTracker
-    byte_tracker = sv.ByteTrack(
-        track_activation_threshold=0.25,
-        lost_track_buffer=100,
-        minimum_matching_threshold=0.8,
-        frame_rate=video_info.fps
-    )
-    # byte_tracker = sv.ByteTrack()
+    # tracker = SORTTracker(
+    #     track_activation_threshold=0.25,
+    #     lost_track_buffer=100,
+    #     minimum_iou_threshold=0.8,
+    #     frame_rate=video_info.fps
+    # )
+
+    # tracker = BoTSORTTracker(track_activation_threshold=0.25,
+    #     lost_track_buffer=100,
+    #     minimum_iou_threshold=0.8,
+    #     frame_rate=video_info.fps)
+    tracker = CBIoUTracker(track_activation_threshold=0.25,
+    #     lost_track_buffer=100,
+    #     minimum_iou_threshold=0.8,
+    #     frame_rate=video_info.fps)
+    # tracker = OCSORTTracker(track_activation_threshold=0.25,
+    #     lost_track_buffer=100,
+    #     minimum_iou_threshold=0.8,
+    #     frame_rate=video_info.fps)
+
+    # tracker = ByteTrackTracker(
+    #     track_activation_threshold=0.25,
+    #     lost_track_buffer=100,
+    #     minimum_iou_threshold=0.8,
+    #     frame_rate=video_info.fps
+    # )
+
     fps_monitor = sv.FPSMonitor()
     # heat_map = sv.HeatMapAnnotator()
     # smoother = sv.DetectionsSmoother()
@@ -397,7 +419,7 @@ def main():
         # results = model(frame)[0]
         detections = sv.Detections.from_ultralytics(results)
         detections = detections[np.isin(detections.class_id, selected_classes)] # filer on selected classes
-        detections = byte_tracker.update_with_detections(detections)
+        detections = tracker.update(detections)
         # detections = smoother.update_with_detections(detections)
 
         # copy frame before annotate                     
