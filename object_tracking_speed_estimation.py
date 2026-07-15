@@ -224,21 +224,18 @@ def main():
     #     lost_track_buffer=100,
     #     minimum_iou_threshold=0.8,
     #     frame_rate=video_info.fps)
-    tracker = CBIoUTracker(track_activation_threshold=0.25,
+    # tracker = CBIoUTracker(track_activation_threshold=0.25,
     #     lost_track_buffer=100,
     #     minimum_iou_threshold=0.8,
     #     frame_rate=video_info.fps)
-    # tracker = OCSORTTracker(track_activation_threshold=0.25,
-    #     lost_track_buffer=100,
-    #     minimum_iou_threshold=0.8,
-    #     frame_rate=video_info.fps)
+    # tracker = OCSORTTracker()
 
-    # tracker = ByteTrackTracker(
-    #     track_activation_threshold=0.25,
-    #     lost_track_buffer=100,
-    #     minimum_iou_threshold=0.8,
-    #     frame_rate=video_info.fps
-    # )
+    tracker = ByteTrackTracker(
+        track_activation_threshold=0.25,
+        lost_track_buffer=100,
+        minimum_iou_threshold=0.8,
+        frame_rate=video_info.fps
+    )
 
     fps_monitor = sv.FPSMonitor()
     # heat_map = sv.HeatMapAnnotator()
