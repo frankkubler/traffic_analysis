@@ -15,3 +15,4 @@ sdist
 var
 *.log
 kernel.errors.txt
+ov_cache/

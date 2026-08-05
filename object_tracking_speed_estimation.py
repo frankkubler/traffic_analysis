@@ -1,4 +1,10 @@
 
+import os
+import warnings
+
+os.environ.setdefault("QT_QPA_PLATFORM", "xcb")  # cv2's bundled Qt has no wayland plugin
+warnings.filterwarnings("ignore", category=FutureWarning, module="trackers")
+
 from vidgear.gears import CamGear
 import cv2
 import numpy as np
@@ -412,7 +418,8 @@ def main():
         speed_labels = [], [], []
         # Force CPU device: OpenVINO on Intel iGPU triggers an IGC kernel error
         # (intersecting register V37/V38) causing NaN outputs and garbage detections
-        results = model_openvino(frame, imgsz=640, verbose=False)[0]
+        results = model_openvino(frame, imgsz=640, verbose=False,
+                            device="intel:gpu")[0]
         # results = model(frame)[0]
         detections = sv.Detections.from_ultralytics(results)
         detections = detections[np.isin(detections.class_id, selected_classes)] # filer on selected classes
